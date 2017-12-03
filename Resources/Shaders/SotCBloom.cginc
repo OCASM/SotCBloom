@@ -21,6 +21,7 @@ v2f vert (appdata v)
 }
 
 sampler2D _MainTex;
+float4 _MainTex_TexelSize;
 sampler2D _SourceTex;
 sampler2D _GhostTex;
 sampler2D _CameraDepthTexture;
@@ -30,17 +31,8 @@ fixed _BlendFac;
 fixed _Ghosting;
 fixed _DistMul;
 
-// static float positionKernel1D5[5] = {	-2.5, -1.5, 0, 1.5, 2.5 };
-// static float positionKernel1DWeights5[5] = { 0.006007, 0.006377, 0.006506, 0.006377, 0.006007 };
-
-static float positionKernel1D25[25] = {	-12.5, -11.5, -10.5, -8.5, -9.5, -7.5, -6.5, -5.5, -4.5, -3.5, -2.5, -1.5, 0, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 11.5, 12.5 };
-static float positionKernel1DWeights25[25] = {
-	0.000369, 0.000583,	0.000886, 0.001294,	0.001816,
-	0.00245, 0.003174, 0.003952, 0.004729, 0.005437,
-	0.006007, 0.006377, 0.006506, 0.006377, 0.006007,
-	0.005437, 0.004729, 0.003952, 0.003174, 0.00245,
-	0.001816, 0.001294, 0.000886, 0.000583, 0.000369
-};
+static float blurKernel[3] = {-1.5, 0, 1.5};
+static int kernelSize = 3;
 
 fixed4 frag0 (v2f i) : SV_Target
 {	
@@ -55,24 +47,20 @@ fixed4 frag0 (v2f i) : SV_Target
 
 fixed4 frag1 (v2f i) : SV_Target
 {
-	float2 inputUV = i.uv;
-	fixed4 colorSample = fixed4(0,0,0,0);
-			
-	for (int i=0; i<25; i++){
-		colorSample += tex2D(_MainTex, float2(inputUV.x + positionKernel1D25[i] * positionKernel1DWeights25[i], inputUV.y));
+	fixed4 col = 0;			
+	for (int p = 0; p < kernelSize; p++){
+		col += tex2D(_MainTex, float2(i.uv.x + blurKernel[p] * _MainTex_TexelSize.x, i.uv.y));
 	}
-	return colorSample / 25;
+	return col / kernelSize;
 }
 
 fixed4 frag2 (v2f i) : SV_Target
 {
-	float2 inputUV = i.uv;
-	fixed4 colorSample = fixed4(0,0,0,0);
-			
-	for (int i=0; i<25; i++){
-			colorSample += tex2D(_MainTex, float2(inputUV.x, positionKernel1D25[i] * positionKernel1DWeights25[i] + inputUV.y));
+	fixed4 col = 0;	
+	for (int p = 0; p < kernelSize; p++){
+		col += tex2D(_MainTex, float2(i.uv.x, i.uv.y + blurKernel[p] * _MainTex_TexelSize.y));
 	}
-	return colorSample / 25;
+	return col / kernelSize;
 }
 
 fixed4 frag3 (v2f i) : SV_Target
@@ -80,6 +68,6 @@ fixed4 frag3 (v2f i) : SV_Target
 	fixed4 bloom = tex2D(_MainTex, i.uv);
 	fixed4 source = tex2D(_SourceTex,i.uv);
 
-	return lerp(source + bloom * _Intensity, bloom * _Intensity , _BlendFac);
-	//return source + bloom * _Intensity;
+	return lerp(source + bloom * _Intensity, bloom * _Intensity , _BlendFac); // Additive
+        // return 1 - (1 - source) * (1 - bloom * _Intensity * _BloomTint); // Screen
 }
